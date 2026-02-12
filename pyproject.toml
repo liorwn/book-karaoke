@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "book-karaoke"
+version = "0.1.0"
+description = "Convert books into karaoke-style videos with synchronized word highlighting"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Lior Weinstein" },
+]
+
+dependencies = [
+    "edge-tts>=6.1.0",
+    "mlx-whisper>=0.4.0",
+    "Pillow>=10.0.0",
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.scripts]
+book-karaoke = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["src*"]

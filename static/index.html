@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Karaoke</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="bg-[#0d0d1a] text-gray-200 antialiased">
+
+  <!-- ================================================================
+       UPLOAD SECTION
+       ================================================================ -->
+  <section id="upload-section" class="app-section flex flex-col items-center justify-center min-h-screen px-4">
+    <div class="text-center mb-12">
+      <h1 class="text-4xl font-bold tracking-tight mb-2">Book Karaoke</h1>
+      <p class="text-gray-500 text-lg">Turn any text into a karaoke video</p>
+    </div>
+
+    <div class="upload-area w-full">
+      <div id="drop-zone">
+        <div class="upload-icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" class="w-16 h-16 mx-auto text-gray-500">
+            <path d="M32 44V20M22 30l10-10 10 10"/>
+            <path d="M52 40v8a4 4 0 01-4 4H16a4 4 0 01-4-4v-8"/>
+          </svg>
+        </div>
+        <p class="text-gray-400 text-lg mb-2">Drop your text, audio, or ebook here</p>
+        <p class="text-gray-600 text-sm">Supports .txt, .md, .epub, .mp3, .wav, .m4a</p>
+        <input type="file" class="hidden" accept=".txt,.md,.epub,.mp3,.wav,.m4a,.ogg,.pdf">
+
+        <div class="upload-progress-track mt-6">
+          <div id="upload-progress-bar"></div>
+        </div>
+        <p id="upload-status" class="text-gray-600 text-sm mt-3"></p>
+      </div>
+
+      <!-- Text input divider + textarea -->
+      <div class="text-input-divider">
+        <span>or paste text directly</span>
+      </div>
+
+      <div class="text-input-area">
+        <textarea id="text-input"
+          placeholder="Paste or type your text here..."
+          rows="5"
+          class="text-input-textarea"></textarea>
+        <div class="text-input-footer">
+          <span id="char-count" class="char-count">0 characters</span>
+          <button id="generate-btn" class="generate-btn" disabled>Generate Karaoke</button>
+        </div>
+      </div>
+
+      <!-- Generation Settings -->
+      <div class="pregen-settings">
+        <span class="pregen-label">Generation Settings</span>
+        <div class="pregen-controls">
+          <div class="pregen-control">
+            <label for="pregen-voice">Voice</label>
+            <select id="pregen-voice">
+              <option value="andrew" selected>Andrew</option>
+              <option value="ava">Ava</option>
+              <option value="brian">Brian</option>
+              <option value="christopher">Christopher</option>
+              <option value="emma">Emma</option>
+              <option value="eric">Eric</option>
+              <option value="guy">Guy</option>
+              <option value="jenny">Jenny</option>
+              <option value="roger">Roger</option>
+              <option value="steffan">Steffan</option>
+            </select>
+          </div>
+          <div class="pregen-control">
+            <label for="pregen-words-per-chunk">Words/Chunk <span id="pregen-wpc-value">20</span></label>
+            <input type="range" id="pregen-words-per-chunk" min="8" max="40" value="20" step="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Demo button -->
+      <div class="text-center mt-8">
+        <button id="demo-btn"
+          class="px-6 py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-yellow-400 hover:border-yellow-400/50 transition-all text-sm">
+          Try Demo Mode
+        </button>
+        <p class="text-gray-700 text-xs mt-2">No upload needed -- see the player with sample text</p>
+      </div>
+
+      <!-- Saved Projects Library -->
+      <div id="projects-library" class="projects-library hidden">
+        <h3 class="projects-heading">Your Projects</h3>
+        <div id="projects-list" class="projects-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       PROCESSING SECTION
+       ================================================================ -->
+  <section id="processing-section" class="app-section hidden flex flex-col items-center justify-center min-h-screen px-4">
+    <div class="processing-card">
+      <h2 class="text-xl font-semibold text-gray-200 mb-6">Generating Karaoke</h2>
+
+      <div class="pipeline-steps">
+        <div class="pipeline-step" data-step="tts">
+          <div class="step-dot"></div>
+          <div class="step-info">
+            <span class="step-label">Text-to-Speech</span>
+            <span class="step-detail">Generating audio from text</span>
+          </div>
+        </div>
+        <div class="pipeline-step" data-step="align">
+          <div class="step-dot"></div>
+          <div class="step-info">
+            <span class="step-label">Alignment</span>
+            <span class="step-detail">Transcribing word-level timestamps</span>
+          </div>
+        </div>
+        <div class="pipeline-step" data-step="chunk">
+          <div class="step-dot"></div>
+          <div class="step-info">
+            <span class="step-label">Chunking</span>
+            <span class="step-detail">Splitting text into display groups</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="processing-progress-track">
+        <div id="processing-progress-bar"></div>
+      </div>
+      <p id="processing-status" class="text-gray-500 text-sm mt-3 text-center">Starting pipeline...</p>
+
+      <button id="cancel-btn" class="cancel-btn mt-6">Cancel</button>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       PLAYER SECTION
+       ================================================================ -->
+  <section id="player-section" class="app-section hidden">
+    <div class="player-wrapper">
+
+      <!-- Back button -->
+      <button id="back-btn">&larr; Back</button>
+
+      <!-- Search toggle -->
+      <button id="search-toggle" title="Search (Ctrl+F)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+      </button>
+
+      <!-- Search bar -->
+      <div id="search-bar" class="search-bar hidden">
+        <div class="search-inner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" id="search-input" placeholder="Search text..." autocomplete="off">
+          <span id="search-count" class="search-count"></span>
+          <button id="search-prev" class="search-nav-btn" title="Previous match">&uarr;</button>
+          <button id="search-next" class="search-nav-btn" title="Next match">&darr;</button>
+          <button id="search-close" class="search-nav-btn" title="Close">&times;</button>
+        </div>
+      </div>
+
+      <!-- Settings toggle -->
+      <button id="settings-toggle" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+      </button>
+
+      <!-- Karaoke Display -->
+      <div class="karaoke-display">
+        <div id="karaoke-text"></div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-container">
+        <div id="progress-bar-track">
+          <div id="progress-bar-fill"></div>
+        </div>
+        <div class="time-display">
+          <span id="time-current">0:00</span>
+          <span id="time-total">0:00</span>
+        </div>
+      </div>
+
+      <!-- Transport Controls -->
+      <div class="transport-bar">
+        <div class="flex items-center justify-between">
+          <!-- Volume (left) -->
+          <div class="volume-control">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-gray-500">
+              <path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/>
+            </svg>
+            <input type="range" id="volume-slider" min="0" max="100" value="80" class="w-20">
+          </div>
+
+          <!-- Play controls (center) -->
+          <div class="transport-controls">
+            <button id="skip-back-btn" class="transport-btn" title="Back 5s">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                <path d="M12.5 8V4l-6 6 6 6v-4c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4.5c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                <text x="10" y="14" font-size="6" text-anchor="middle" fill="currentColor">5</text>
+              </svg>
+            </button>
+
+            <button id="play-btn" class="transport-btn" title="Play / Pause">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                <polygon points="5,3 19,12 5,21"/>
+              </svg>
+            </button>
+
+            <button id="skip-fwd-btn" class="transport-btn" title="Forward 5s">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                <path d="M11.5 8V4l6 6-6 6v-4c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
+                <text x="14" y="14" font-size="6" text-anchor="middle" fill="currentColor">5</text>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Speed (right) -->
+          <div class="speed-control">
+            <button id="speed-btn" class="speed-btn" title="Playback speed">1x</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Bar -->
+      <div id="export-controls" class="export-bar">
+        <button data-export="mp4" class="export-btn" disabled>Export MP4</button>
+        <button data-export="srt" class="export-btn" disabled>Export SRT</button>
+        <button data-export="vtt" class="export-btn" disabled>Export VTT</button>
+        <button data-export="html" class="export-btn export-btn-html" disabled>Export HTML</button>
+        <span class="export-status"></span>
+        <div class="export-progress-track">
+          <div class="export-progress-bar"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       SETTINGS PANEL (slides in from right)
+       ================================================================ -->
+  <aside id="settings-panel" class="settings-panel">
+    <h2 class="text-lg font-semibold text-gray-200 mb-6">Settings</h2>
+
+    <!-- Theme Presets -->
+    <h3>Theme</h3>
+    <div class="theme-presets">
+      <button class="theme-btn" data-theme="dark">
+        <div class="theme-preview">
+          <span class="theme-dot" style="background:#1a1a2e"></span>
+          <span class="theme-dot" style="background:#FFD700"></span>
+          <span class="theme-dot" style="background:#BBBBBB"></span>
+        </div>
+        Dark
+      </button>
+      <button class="theme-btn" data-theme="light">
+        <div class="theme-preview">
+          <span class="theme-dot" style="background:#FFFFFF; border:1px solid #ccc"></span>
+          <span class="theme-dot" style="background:#2563EB"></span>
+          <span class="theme-dot" style="background:#333333"></span>
+        </div>
+        Light
+      </button>
+      <button class="theme-btn" data-theme="sepia">
+        <div class="theme-preview">
+          <span class="theme-dot" style="background:#F4ECD8"></span>
+          <span class="theme-dot" style="background:#8B4513"></span>
+          <span class="theme-dot" style="background:#5C4033"></span>
+        </div>
+        Sepia
+      </button>
+      <button class="theme-btn" data-theme="neon">
+        <div class="theme-preview">
+          <span class="theme-dot" style="background:#0a0a0a"></span>
+          <span class="theme-dot" style="background:#00FF88"></span>
+          <span class="theme-dot" style="background:#FF00FF"></span>
+        </div>
+        Neon
+      </button>
+    </div>
+
+    <!-- Colors -->
+    <h3>Colors</h3>
+    <div class="settings-group">
+      <label>Background <input type="color" id="setting-bg" value="#1a1a2e"></label>
+    </div>
+    <div class="settings-group">
+      <label>Highlight <input type="color" id="setting-highlight" value="#FFD700"></label>
+    </div>
+    <div class="settings-group">
+      <label>Spoken <input type="color" id="setting-spoken" value="#BBBBBB"></label>
+    </div>
+    <div class="settings-group">
+      <label>Upcoming <input type="color" id="setting-upcoming" value="#555555"></label>
+    </div>
+
+    <!-- Font Size -->
+    <h3>Display</h3>
+    <div class="settings-group">
+      <label>Font Size <span id="font-size-value" class="text-gray-500">48px</span></label>
+      <input type="range" id="setting-font-size" min="24" max="80" value="48" step="2">
+    </div>
+
+    <!-- Generation settings (require re-processing) -->
+    <h3>Generation</h3>
+    <div class="regen-section">
+      <p class="regen-note">Changing these requires re-generating the audio</p>
+
+      <div class="settings-group">
+        <label>Voice</label>
+        <select id="setting-voice">
+              <option value="andrew" selected>Andrew</option>
+              <option value="ava">Ava</option>
+              <option value="brian">Brian</option>
+              <option value="christopher">Christopher</option>
+              <option value="emma">Emma</option>
+              <option value="eric">Eric</option>
+              <option value="guy">Guy</option>
+              <option value="jenny">Jenny</option>
+              <option value="roger">Roger</option>
+              <option value="steffan">Steffan</option>
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>Words per Chunk <span id="words-per-chunk-value" class="text-gray-500">20</span></label>
+        <input type="range" id="setting-words-per-chunk" min="8" max="40" value="20" step="1">
+      </div>
+
+      <button id="regenerate-btn" class="regen-btn" disabled>Re-generate</button>
+    </div>
+
+    <!-- Keyboard shortcuts -->
+    <h3>Shortcuts</h3>
+    <div class="text-sm text-gray-500 space-y-1">
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">Space</kbd> Play / Pause</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&larr;</kbd> Rewind 5s</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&rarr;</kbd> Forward 5s</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&#8984;F</kbd> Search text</p>
+    </div>
+  </aside>
+
+  <!-- Notification toast -->
+  <div id="notification" class="notification notification-info"></div>
+
+  <!-- Scripts (order matters: dependencies first) -->
+  <script src="/static/js/player.js"></script>
+  <script src="/static/js/renderer.js"></script>
+  <script src="/static/js/settings.js"></script>
+  <script src="/static/js/upload.js"></script>
+  <script src="/static/js/export.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
