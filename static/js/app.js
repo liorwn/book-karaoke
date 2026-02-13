@@ -170,6 +170,23 @@ class BookKaraokeApp {
     // Chapter state
     this.chapters = null;
     this._currentChapterIdx = -1;
+    // Teleprompter state
+    this._teleprompterMode = false;
+    this.teleprompterRenderer = null;
+    // Speed state (instance-level for keyboard access)
+    this._speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+    this._speedIdx = 2;
+    // Mute state
+    this._savedVolume = 0.8;
+    this._muted = false;
+    // Shortcuts overlay
+    this._shortcutsOverlay = null;
+  }
+
+  get activeRenderer() {
+    return this._teleprompterMode && this.teleprompterRenderer
+      ? this.teleprompterRenderer
+      : this.renderer;
   }
 
   init() {
@@ -221,6 +238,12 @@ class BookKaraokeApp {
       chaptersToggle.addEventListener('click', () => {
         chaptersPanel.classList.toggle('open');
       });
+    }
+
+    // Teleprompter toggle
+    const teleprompterToggle = document.getElementById('teleprompter-toggle');
+    if (teleprompterToggle) {
+      teleprompterToggle.addEventListener('click', () => this.toggleTeleprompter());
     }
 
     // Check if we're on a project URL (/p/{slug})
@@ -296,8 +319,23 @@ class BookKaraokeApp {
       this._hideChapterNav();
     }
 
+    // Configure teleprompter renderer if it exists
+    if (this.teleprompterRenderer) {
+      this.teleprompterRenderer.setChunks(timestamps);
+      this.teleprompterRenderer.setFormatting(formatting || {});
+    }
+
     await this.player.loadAudio(audioUrl);
-    this.renderer.showChunk(0, false);
+
+    // If teleprompter mode is active, rebuild it; otherwise show chunk
+    if (this._teleprompterMode && this.teleprompterRenderer) {
+      this.teleprompterRenderer.build(this.chapters);
+      const display = document.querySelector('.karaoke-display');
+      if (display) display.classList.add('teleprompter-display');
+      document.getElementById('karaoke-text').classList.add('teleprompter-active');
+    } else {
+      this.renderer.showChunk(0, false);
+    }
   }
 
   // --- Private ---
@@ -790,8 +828,8 @@ class BookKaraokeApp {
   _wirePlayerEvents() {
     this.player.addEventListener('timeupdate', (e) => {
       const { time, progress, chunkIndex, wordIndex, fadeAlpha } = e.detail;
-      this.renderer.updateTime(time, chunkIndex, wordIndex, fadeAlpha);
-      this.renderer.updateProgress(progress);
+      this.activeRenderer.updateTime(time, chunkIndex, wordIndex, fadeAlpha);
+      this.activeRenderer.updateProgress(progress);
 
       // Update time display
       const currentEl = document.getElementById('time-current');
@@ -806,6 +844,7 @@ class BookKaraokeApp {
     });
 
     this.player.addEventListener('chunkchange', (e) => {
+      if (this._teleprompterMode) return;
       const { chunkIndex } = e.detail;
       this.renderer.showChunk(chunkIndex);
     });
@@ -870,14 +909,8 @@ class BookKaraokeApp {
     // Speed control — cycles through rates on click
     const speedBtn = document.getElementById('speed-btn');
     if (speedBtn) {
-      const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
-      let speedIdx = 2; // start at 1x
       speedBtn.addEventListener('click', () => {
-        speedIdx = (speedIdx + 1) % speeds.length;
-        const rate = speeds[speedIdx];
-        this.player.setPlaybackRate(rate);
-        speedBtn.textContent = rate === 1 ? '1x' : rate + 'x';
-        speedBtn.classList.toggle('speed-active', rate !== 1);
+        this._setSpeed((this._speedIdx + 1) % this._speeds.length);
       });
     }
 
@@ -890,13 +923,23 @@ class BookKaraokeApp {
         return;
       }
 
-      // Escape: close search
+      // Escape: close search + shortcuts overlay
       if (e.key === 'Escape') {
         this._closeSearch();
+        if (this._shortcutsOverlay) this._closeShortcutsHelp();
         return;
       }
 
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+      // ? (Shift+/) — shortcuts help
+      if (e.key === '?' || (e.shiftKey && e.code === 'Slash')) {
+        e.preventDefault();
+        this._toggleShortcutsHelp();
+        return;
+      }
+
+      if (this.state !== STATE.PLAYING) return;
 
       switch (e.code) {
         case 'Space':
@@ -911,8 +954,42 @@ class BookKaraokeApp {
           e.preventDefault();
           this.player.seek(this.player.currentTime + 5);
           break;
+        case 'ArrowUp':
+          e.preventDefault();
+          this._adjustVolume(5);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          this._adjustVolume(-5);
+          break;
+        case 'KeyM':
+          this._toggleMute();
+          break;
+        case 'BracketLeft':
+          this._setSpeed(Math.max(0, this._speedIdx - 1));
+          break;
+        case 'BracketRight':
+          this._setSpeed(Math.min(this._speeds.length - 1, this._speedIdx + 1));
+          break;
+        case 'KeyT':
+          this.toggleTeleprompter();
+          break;
+        case 'KeyN':
+          this._navigateChapter(1);
+          break;
+        case 'KeyP':
+          this._navigateChapter(-1);
+          break;
+        case 'PageDown':
+          e.preventDefault();
+          this._navigateChapter(1);
+          break;
+        case 'PageUp':
+          e.preventDefault();
+          this._navigateChapter(-1);
+          break;
         case 'KeyC':
-          if (this.chapters && this.state === STATE.PLAYING) {
+          if (this.chapters) {
             const cp = document.getElementById('chapters-panel');
             if (cp) cp.classList.toggle('open');
           }
@@ -946,9 +1023,171 @@ class BookKaraokeApp {
     }
   }
 
+  // --- Speed / Volume / Mute / Chapter helpers ---
+
+  _setSpeed(idx) {
+    this._speedIdx = idx;
+    const rate = this._speeds[idx];
+    this.player.setPlaybackRate(rate);
+    const btn = document.getElementById('speed-btn');
+    if (btn) {
+      btn.textContent = rate === 1 ? '1x' : rate + 'x';
+      btn.classList.toggle('speed-active', rate !== 1);
+    }
+  }
+
+  _toggleMute() {
+    const slider = document.getElementById('volume-slider');
+    if (this._muted) {
+      this._muted = false;
+      this.player.setVolume(this._savedVolume);
+      if (slider) slider.value = this._savedVolume * 100;
+    } else {
+      this._savedVolume = this.player.audio ? this.player.audio.volume : 0.8;
+      this._muted = true;
+      this.player.setVolume(0);
+      if (slider) slider.value = 0;
+    }
+  }
+
+  _adjustVolume(delta) {
+    const slider = document.getElementById('volume-slider');
+    const current = slider ? parseInt(slider.value) : 80;
+    const next = Math.max(0, Math.min(100, current + delta));
+    if (slider) slider.value = next;
+    this.player.setVolume(next / 100);
+    this._muted = next === 0;
+  }
+
+  _navigateChapter(direction) {
+    if (!this.chapters || this.chapters.length === 0) return;
+    const newIdx = Math.max(0, Math.min(this.chapters.length - 1, this._currentChapterIdx + direction));
+    if (newIdx === this._currentChapterIdx && direction !== 0) return;
+    const ch = this.chapters[newIdx];
+    this.player.seek(ch.start_time);
+    if (!this._teleprompterMode) {
+      this.renderer.showChunk(ch.start_chunk, false);
+    }
+    this._setActiveChapter(newIdx);
+  }
+
+  // --- Teleprompter Mode ---
+
+  toggleTeleprompter() {
+    if (this.state !== STATE.PLAYING) return;
+
+    this._teleprompterMode = !this._teleprompterMode;
+    const display = document.querySelector('.karaoke-display');
+    const textEl = document.getElementById('karaoke-text');
+    const toggleBtn = document.getElementById('teleprompter-toggle');
+
+    if (this._teleprompterMode) {
+      // Enable teleprompter
+      if (!this.teleprompterRenderer) {
+        this.teleprompterRenderer = new TeleprompterRenderer(textEl, document.getElementById('progress-bar-fill'));
+      }
+      this.teleprompterRenderer.setChunks(this.player.chunks);
+      this.teleprompterRenderer.setFormatting(this.renderer.formatting || {});
+      this.teleprompterRenderer.build(this.chapters);
+      const s = this.settings.getSettings();
+      this.teleprompterRenderer.applySettings(s);
+
+      if (display) display.classList.add('teleprompter-display');
+      textEl.classList.add('teleprompter-active');
+      if (toggleBtn) toggleBtn.classList.add('active');
+      this._showNotification('Teleprompter mode', 'info');
+    } else {
+      // Disable teleprompter
+      if (display) display.classList.remove('teleprompter-display');
+      textEl.classList.remove('teleprompter-active');
+      if (toggleBtn) toggleBtn.classList.remove('active');
+
+      // Re-render current chunk
+      const ci = this.player.activeChunkIndex;
+      if (ci >= 0) {
+        this.renderer.showChunk(ci, false);
+      }
+      this._showNotification('Chunk mode', 'info');
+    }
+  }
+
+  // --- Shortcuts Help Overlay ---
+
+  _toggleShortcutsHelp() {
+    if (this._shortcutsOverlay) {
+      this._closeShortcutsHelp();
+    } else {
+      this._openShortcutsHelp();
+    }
+  }
+
+  _openShortcutsHelp() {
+    if (this._shortcutsOverlay) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'shortcuts-overlay';
+
+    overlay.innerHTML = `
+      <div class="shortcuts-card">
+        <h2>Keyboard Shortcuts</h2>
+
+        <div class="shortcuts-group-title">Playback</div>
+        <div class="shortcuts-grid">
+          <kbd>Space</kbd><span class="shortcut-desc">Play / Pause</span>
+          <kbd>&larr;</kbd><span class="shortcut-desc">Rewind 5s</span>
+          <kbd>&rarr;</kbd><span class="shortcut-desc">Forward 5s</span>
+        </div>
+
+        <div class="shortcuts-group-title">Audio</div>
+        <div class="shortcuts-grid">
+          <kbd>&uarr;</kbd><span class="shortcut-desc">Volume up</span>
+          <kbd>&darr;</kbd><span class="shortcut-desc">Volume down</span>
+          <kbd>M</kbd><span class="shortcut-desc">Mute / Unmute</span>
+          <kbd>[</kbd><span class="shortcut-desc">Slower</span>
+          <kbd>]</kbd><span class="shortcut-desc">Faster</span>
+        </div>
+
+        <div class="shortcuts-group-title">Navigation</div>
+        <div class="shortcuts-grid">
+          <kbd>N</kbd><span class="shortcut-desc">Next chapter</span>
+          <kbd>P</kbd><span class="shortcut-desc">Previous chapter</span>
+          <kbd>C</kbd><span class="shortcut-desc">Chapters panel</span>
+          <kbd>&#8984;F</kbd><span class="shortcut-desc">Search text</span>
+        </div>
+
+        <div class="shortcuts-group-title">Display</div>
+        <div class="shortcuts-grid">
+          <kbd>T</kbd><span class="shortcut-desc">Teleprompter mode</span>
+          <kbd>?</kbd><span class="shortcut-desc">This help</span>
+          <kbd>Esc</kbd><span class="shortcut-desc">Close overlay</span>
+        </div>
+
+        <div class="shortcuts-close-hint">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</div>
+      </div>
+    `;
+
+    // Close on backdrop click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this._closeShortcutsHelp();
+    });
+
+    document.body.appendChild(overlay);
+    this._shortcutsOverlay = overlay;
+  }
+
+  _closeShortcutsHelp() {
+    if (this._shortcutsOverlay) {
+      this._shortcutsOverlay.remove();
+      this._shortcutsOverlay = null;
+    }
+  }
+
   _wireSettingsEvents() {
     this.settings.onChange((s) => {
       this.renderer.applySettings(s);
+      if (this.teleprompterRenderer) {
+        this.teleprompterRenderer.applySettings(s);
+      }
     });
 
     // Track generation settings changes to enable Re-generate button

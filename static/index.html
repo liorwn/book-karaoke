@@ -154,6 +154,16 @@
         </svg>
       </button>
 
+      <!-- Teleprompter toggle -->
+      <button id="teleprompter-toggle" title="Teleprompter (T)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+          <path d="M4 6h16"/>
+          <path d="M4 10h16"/>
+          <path d="M4 14h12"/>
+          <path d="M4 18h8"/>
+        </svg>
+      </button>
+
       <!-- Search toggle -->
       <button id="search-toggle" title="Search (Ctrl+F)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
@@ -363,10 +373,14 @@
     <h3>Shortcuts</h3>
     <div class="text-sm text-gray-500 space-y-1">
       <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">Space</kbd> Play / Pause</p>
-      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&larr;</kbd> Rewind 5s</p>
-      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&rarr;</kbd> Forward 5s</p>
-      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&#8984;F</kbd> Search text</p>
-      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">C</kbd> Chapters</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&larr;</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&rarr;</kbd> Skip 5s</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&uarr;</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&darr;</kbd> Volume</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">M</kbd> Mute</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">[</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">]</kbd> Speed</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">T</kbd> Teleprompter</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">N</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">P</kbd> Chapters</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">&#8984;F</kbd> Search</p>
+      <p><kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-xs">?</kbd> All shortcuts</p>
     </div>
   </aside>
 
@@ -376,6 +390,7 @@
   <!-- Scripts (order matters: dependencies first) -->
   <script src="/static/js/player.js"></script>
   <script src="/static/js/renderer.js"></script>
+  <script src="/static/js/teleprompter.js"></script>
   <script src="/static/js/settings.js"></script>
   <script src="/static/js/upload.js"></script>
   <script src="/static/js/export.js"></script>

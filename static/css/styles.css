@@ -1310,6 +1310,189 @@ body {
   border-radius: 3px;
 }
 
+/* --- Teleprompter Mode --- */
+.karaoke-display.teleprompter-display {
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+#karaoke-text.teleprompter-active {
+  text-align: left;
+  max-width: 700px;
+}
+
+.teleprompter-scroll {
+  height: 100%;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: 40vh 0;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.teleprompter-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.teleprompter-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.teleprompter-scroll::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+.teleprompter-chunk {
+  margin-bottom: 1em;
+  line-height: 1.7;
+}
+
+.teleprompter-chapter-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--karaoke-highlight);
+  margin: 2em 0 0.6em;
+  opacity: 0.7;
+}
+
+.teleprompter-chapter-title:first-child {
+  margin-top: 0;
+}
+
+/* Teleprompter toggle button */
+#teleprompter-toggle {
+  position: fixed;
+  top: 16px;
+  right: 104px;
+  z-index: 101;
+  background: rgba(17, 17, 24, 0.8);
+  border: 1px solid #333;
+  color: #ccc;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s;
+  display: none;
+}
+
+#teleprompter-toggle:hover {
+  background: rgba(30, 30, 40, 0.9);
+  color: #fff;
+}
+
+#teleprompter-toggle.active {
+  border-color: var(--karaoke-highlight);
+  color: var(--karaoke-highlight);
+}
+
+#teleprompter-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+body[data-state="playing"] #teleprompter-toggle {
+  display: block;
+}
+
+/* --- Shortcuts Help Overlay --- */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  animation: shortcuts-fade-in 0.15s ease;
+}
+
+@keyframes shortcuts-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shortcuts-card {
+  background: #16161e;
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 540px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.shortcuts-card h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0 0 20px;
+}
+
+.shortcuts-group-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #666;
+  margin: 18px 0 8px;
+}
+
+.shortcuts-group-title:first-of-type {
+  margin-top: 0;
+}
+
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  align-items: center;
+}
+
+.shortcuts-grid kbd {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 28px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.shortcuts-grid .shortcut-desc {
+  font-size: 13px;
+  color: #999;
+}
+
+.shortcuts-close-hint {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 12px;
+  color: #555;
+}
+
+@media (max-width: 768px) {
+  #teleprompter-toggle {
+    right: 88px;
+  }
+
+  .shortcuts-card {
+    padding: 24px;
+    max-width: 95%;
+  }
+
+  .teleprompter-scroll {
+    padding: 30vh 0;
+  }
+}
+
 /* --- Selection --- */
 ::selection {
   background: color-mix(in srgb, var(--karaoke-highlight) 30%, transparent);
