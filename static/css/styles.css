@@ -834,6 +834,136 @@ body {
   color: #fff;
 }
 
+/* --- Chapters panel --- */
+.chapters-panel {
+  position: fixed;
+  top: 0;
+  left: -360px;
+  width: 340px;
+  height: 100vh;
+  background: #111118;
+  border-right: 1px solid #222;
+  z-index: 100;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.chapters-panel.open {
+  left: 0;
+}
+
+.chapters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chapter-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: #ccc;
+  font-size: 14px;
+  border-top: none;
+  border-bottom: none;
+  border-right: none;
+}
+
+.chapter-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chapter-item.active {
+  border-left-color: var(--karaoke-highlight);
+  background: rgba(255, 215, 0, 0.06);
+  color: #fff;
+}
+
+.chapter-item-number {
+  font-size: 12px;
+  color: #555;
+  min-width: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chapter-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.chapter-item-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.chapter-item-meta {
+  font-size: 12px;
+  color: #555;
+  margin-top: 2px;
+}
+
+/* Chapter title label above karaoke text */
+.chapter-title {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: #666;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+  z-index: 2;
+  transition: opacity 0.3s;
+}
+
+.chapter-title.hidden {
+  display: none;
+}
+
+/* Chapters toggle button */
+#chapters-toggle {
+  position: fixed;
+  top: 16px;
+  left: 60px;
+  z-index: 101;
+  background: rgba(17, 17, 24, 0.8);
+  border: 1px solid #333;
+  color: #ccc;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s;
+}
+
+#chapters-toggle:hover {
+  background: rgba(30, 30, 40, 0.9);
+  color: #fff;
+}
+
+#chapters-toggle.hidden {
+  display: none;
+}
+
+#chapters-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
 /* Search toggle */
 #search-toggle {
   position: fixed;
@@ -1084,6 +1214,21 @@ body {
     min-height: 40vh;
   }
 
+  .chapters-panel {
+    width: 100%;
+    left: -100%;
+    top: auto;
+    bottom: 0;
+    height: 60vh;
+    border-right: none;
+    border-top: 1px solid #222;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .chapters-panel.open {
+    left: 0;
+  }
+
   .settings-panel {
     width: 100%;
     right: -100%;
@@ -1139,6 +1284,19 @@ body {
 }
 
 /* --- Scrollbar styling --- */
+.chapters-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chapters-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chapters-panel::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
 .settings-panel::-webkit-scrollbar {
   width: 6px;
 }

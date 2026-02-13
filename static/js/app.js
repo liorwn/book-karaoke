@@ -167,6 +167,9 @@ class BookKaraokeApp {
     // Search state
     this._searchMatches = [];   // [{chunkIndex, wordIndex, word}]
     this._searchCurrent = -1;
+    // Chapter state
+    this.chapters = null;
+    this._currentChapterIdx = -1;
   }
 
   init() {
@@ -208,6 +211,15 @@ class BookKaraokeApp {
     if (settingsToggle && settingsPanel) {
       settingsToggle.addEventListener('click', () => {
         settingsPanel.classList.toggle('open');
+      });
+    }
+
+    // Chapters toggle
+    const chaptersToggle = document.getElementById('chapters-toggle');
+    const chaptersPanel = document.getElementById('chapters-panel');
+    if (chaptersToggle && chaptersPanel) {
+      chaptersToggle.addEventListener('click', () => {
+        chaptersPanel.classList.toggle('open');
       });
     }
 
@@ -260,7 +272,7 @@ class BookKaraokeApp {
   /**
    * Load external timestamp JSON and audio.
    */
-  async loadProject(audioUrl, timestamps, formatting) {
+  async loadProject(audioUrl, timestamps, formatting, chapters) {
     this.demoMode = false;
     this._showSection('player-section');
     this._setState(STATE.PLAYING);
@@ -275,6 +287,15 @@ class BookKaraokeApp {
     this.player.setTimestamps(timestamps);
     this.renderer.setChunks(timestamps);
     this.renderer.setFormatting(formatting || {});
+
+    // Chapter navigation
+    this.chapters = chapters || null;
+    if (this.chapters && this.chapters.length > 0) {
+      this._renderChapterNav(this.chapters);
+    } else {
+      this._hideChapterNav();
+    }
+
     await this.player.loadAudio(audioUrl);
     this.renderer.showChunk(0, false);
   }
@@ -488,6 +509,104 @@ class BookKaraokeApp {
     });
   }
 
+  // --- Chapter Navigation ---
+
+  _renderChapterNav(chapters) {
+    const toggle = document.getElementById('chapters-toggle');
+    const list = document.getElementById('chapters-list');
+    const titleEl = document.getElementById('chapter-title');
+
+    if (toggle) toggle.classList.remove('hidden');
+    if (titleEl) {
+      titleEl.classList.remove('hidden');
+      titleEl.textContent = chapters[0]?.title || '';
+    }
+
+    if (!list) return;
+    list.innerHTML = '';
+
+    chapters.forEach((ch, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'chapter-item' + (idx === 0 ? ' active' : '');
+      btn.dataset.chapterIdx = idx;
+
+      const duration = ch.end_time - ch.start_time;
+      const meta = [
+        this._formatTime(duration),
+        ch.word_count ? `${ch.word_count} words` : null,
+      ].filter(Boolean).join(' · ');
+
+      btn.innerHTML = `
+        <span class="chapter-item-number">${idx + 1}</span>
+        <div class="chapter-item-info">
+          <div class="chapter-item-title">${this._escapeHtml(ch.title)}</div>
+          ${meta ? `<div class="chapter-item-meta">${meta}</div>` : ''}
+        </div>
+      `;
+
+      btn.addEventListener('click', () => {
+        this.player.seek(ch.start_time);
+        this.renderer.showChunk(ch.start_chunk, false);
+        this._setActiveChapter(idx);
+      });
+
+      list.appendChild(btn);
+    });
+
+    this._currentChapterIdx = 0;
+  }
+
+  _updateCurrentChapter(time) {
+    if (!this.chapters || this.chapters.length === 0) return;
+
+    let idx = 0;
+    for (let i = this.chapters.length - 1; i >= 0; i--) {
+      if (time >= this.chapters[i].start_time) {
+        idx = i;
+        break;
+      }
+    }
+
+    if (idx !== this._currentChapterIdx) {
+      this._setActiveChapter(idx);
+    }
+  }
+
+  _setActiveChapter(idx) {
+    this._currentChapterIdx = idx;
+
+    // Update chapter title label
+    const titleEl = document.getElementById('chapter-title');
+    if (titleEl && this.chapters[idx]) {
+      titleEl.textContent = this.chapters[idx].title;
+    }
+
+    // Update active state in chapter list
+    const items = document.querySelectorAll('.chapter-item');
+    items.forEach((item, i) => {
+      item.classList.toggle('active', i === idx);
+    });
+
+    // Scroll active item into view in the chapters panel
+    const activeItem = items[idx];
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  _hideChapterNav() {
+    const toggle = document.getElementById('chapters-toggle');
+    const panel = document.getElementById('chapters-panel');
+    const titleEl = document.getElementById('chapter-title');
+
+    if (toggle) toggle.classList.add('hidden');
+    if (panel) panel.classList.remove('open');
+    if (titleEl) titleEl.classList.add('hidden');
+
+    this.chapters = null;
+    this._currentChapterIdx = -1;
+  }
+
   async _reprocess() {
     const s = this.settings.getSettings();
     this.player.pause();
@@ -547,7 +666,7 @@ class BookKaraokeApp {
       history.replaceState({ projectId: sessionId }, '', `/p/${sessionId}`);
 
       if (data.audio_url && data.timestamps) {
-        this.loadProject(data.audio_url, data.timestamps, data.formatting);
+        this.loadProject(data.audio_url, data.timestamps, data.formatting, data.chapters);
       }
     });
 
@@ -589,6 +708,7 @@ class BookKaraokeApp {
         `/api/audio/${sessionId}`,
         data.chunks_with_timings,
         data.formatting,
+        data.chapters,
       );
     } catch (err) {
       this._showNotification(err.message, 'error');
@@ -678,6 +798,11 @@ class BookKaraokeApp {
       const totalEl = document.getElementById('time-total');
       if (currentEl) currentEl.textContent = this._formatTime(time);
       if (totalEl) totalEl.textContent = this._formatTime(this.player.duration);
+
+      // Update current chapter highlight
+      if (this.chapters) {
+        this._updateCurrentChapter(time);
+      }
     });
 
     this.player.addEventListener('chunkchange', (e) => {
@@ -786,6 +911,12 @@ class BookKaraokeApp {
           e.preventDefault();
           this.player.seek(this.player.currentTime + 5);
           break;
+        case 'KeyC':
+          if (this.chapters && this.state === STATE.PLAYING) {
+            const cp = document.getElementById('chapters-panel');
+            if (cp) cp.classList.toggle('open');
+          }
+          break;
       }
     });
 
@@ -891,7 +1022,7 @@ class BookKaraokeApp {
       }
 
       if (data.audio_url && data.timestamps) {
-        this.loadProject(data.audio_url, data.timestamps, data.formatting);
+        this.loadProject(data.audio_url, data.timestamps, data.formatting, data.chapters);
       }
     });
 

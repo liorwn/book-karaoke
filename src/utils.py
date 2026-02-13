@@ -335,6 +335,51 @@ def map_whisper_words_to_chunks(
     return chunk_timings
 
 
+def chunk_text_with_chapters(
+    chapters: list[dict],
+    max_words_per_chunk: int = 20,
+) -> tuple[list[str], list[dict]]:
+    """Chunk text respecting chapter boundaries.
+
+    Parameters
+    ----------
+    chapters : list[dict]
+        Each dict has ``"title"`` and ``"text"`` keys.
+    max_words_per_chunk : int
+        Maximum words per display chunk.
+
+    Returns
+    -------
+    (flat_chunks, chapter_ranges) where *flat_chunks* is a single list of
+    chunk strings and *chapter_ranges* is a list of dicts with keys
+    ``title``, ``start_chunk``, ``end_chunk``, ``word_count``.
+    Chunks never cross chapter boundaries.
+    """
+    flat_chunks: list[str] = []
+    chapter_ranges: list[dict] = []
+
+    for ch in chapters:
+        title = ch.get("title", "")
+        text = ch.get("text", "").strip()
+        if not text:
+            continue
+
+        start_idx = len(flat_chunks)
+        ch_chunks = chunk_text(text, max_words_per_chunk=max_words_per_chunk)
+        flat_chunks.extend(ch_chunks)
+        end_idx = len(flat_chunks) - 1
+
+        word_count = len(text.split())
+        chapter_ranges.append({
+            "title": title,
+            "start_chunk": start_idx,
+            "end_chunk": end_idx,
+            "word_count": word_count,
+        })
+
+    return flat_chunks, chapter_ranges
+
+
 def get_audio_duration_seconds(audio_path: str) -> float:
     """Get the duration of an audio file in seconds using ffprobe."""
     import subprocess

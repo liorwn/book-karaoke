@@ -141,6 +141,7 @@ def _save_project(session: dict) -> None:
         "chunks": session.get("chunks"),
         "chunks_with_timings": session.get("chunks_with_timings"),
         "formatting": session.get("formatting", {}),
+        "chapters": session.get("chapters"),
         "audio_file": Path(audio_dest).name if audio_dest else None,
         "input_file": Path(text_dest).name if text_dest else None,
     }
@@ -194,6 +195,7 @@ def _load_projects() -> None:
                 "chunks_with_timings": meta.get("chunks_with_timings"),
                 "settings": meta.get("settings", {}),
                 "formatting": meta.get("formatting", {}),
+                "chapters": meta.get("chapters"),
                 "audio_generated_path": audio_path,
                 "video_path": None,
                 "duration": meta.get("duration"),
@@ -272,6 +274,7 @@ async def upload_file(
         "chunks": None,
         "chunks_with_timings": None,
         "settings": settings,
+        "chapters": None,
         "audio_generated_path": None,
         "video_path": None,
         "duration": None,
@@ -313,6 +316,7 @@ async def reprocess_session(
     session["status"] = "uploaded"
     session["chunks"] = None
     session["chunks_with_timings"] = None
+    session["chapters"] = None
     session["audio_generated_path"] = None
     session["video_path"] = None
     session["duration"] = None
@@ -345,6 +349,7 @@ async def process_session(session_id: str):
                 "timestamps": session["chunks_with_timings"],
                 "duration": session["duration"],
                 "formatting": session.get("formatting", {}),
+                "chapters": session.get("chapters"),
             }
             yield f"event: complete\ndata: {json.dumps(data)}\n\n"
 
@@ -394,6 +399,7 @@ async def process_session(session_id: str):
                 "timestamps": session["chunks_with_timings"],
                 "duration": session["duration"],
                 "formatting": session.get("formatting", {}),
+                "chapters": session.get("chapters"),
             }
             yield f"event: complete\ndata: {json.dumps(data)}\n\n"
 
@@ -430,6 +436,7 @@ def _run_pipeline(session_id: str) -> None:
         session["chunks"] = result.chunks
         session["chunks_with_timings"] = result.chunks_with_timings
         session["formatting"] = result.formatting or {}
+        session["chapters"] = result.chapters
         session["audio_generated_path"] = result.audio_path
         session["duration"] = result.duration
         session["status"] = "ready"
@@ -588,6 +595,7 @@ async def get_timestamps(session_id: str):
         "chunks": session["chunks"],
         "duration": session["duration"],
         "formatting": session.get("formatting", {}),
+        "chapters": session.get("chapters"),
     }
 
 
