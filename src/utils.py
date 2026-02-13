@@ -380,6 +380,83 @@ def chunk_text_with_chapters(
     return flat_chunks, chapter_ranges
 
 
+def split_text_into_segments(text: str, target_words: int = 2000) -> list[dict]:
+    """Split plain text into ~target_words segments at paragraph boundaries.
+
+    Returns a list of ``{"title": "Section N", "text": "..."}`` dicts —
+    same format as EPUB chapters so the pipeline can treat them uniformly.
+    """
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if not paragraphs:
+        return [{"title": "Section 1", "text": text.strip()}]
+
+    segments: list[dict] = []
+    current_paragraphs: list[str] = []
+    current_words = 0
+
+    for para in paragraphs:
+        para_words = len(para.split())
+        if current_words + para_words > target_words and current_paragraphs:
+            segments.append({
+                "title": f"Section {len(segments) + 1}",
+                "text": "\n\n".join(current_paragraphs),
+            })
+            current_paragraphs = []
+            current_words = 0
+        current_paragraphs.append(para)
+        current_words += para_words
+
+    if current_paragraphs:
+        segments.append({
+            "title": f"Section {len(segments) + 1}",
+            "text": "\n\n".join(current_paragraphs),
+        })
+
+    return segments
+
+
+def split_audio_file(audio_path: str, output_dir: str, segment_duration: int = 600) -> list[str]:
+    """Split an audio file into segments using ffmpeg stream copy (no re-encoding).
+
+    Parameters
+    ----------
+    audio_path : str
+        Path to the source audio file.
+    output_dir : str
+        Directory where segment files will be written.
+    segment_duration : int
+        Target duration per segment in seconds (default 600 = 10 minutes).
+
+    Returns
+    -------
+    list[str]
+        Ordered list of segment file paths.
+    """
+    import subprocess, math
+
+    total = get_audio_duration_seconds(audio_path)
+    num_segments = max(1, math.ceil(total / segment_duration))
+
+    ext = Path(audio_path).suffix or ".mp3"
+    segments: list[str] = []
+
+    for i in range(num_segments):
+        start = i * segment_duration
+        seg_path = str(Path(output_dir) / f"audio_seg_{i:03d}{ext}")
+        cmd = [
+            "ffmpeg", "-y", "-v", "quiet",
+            "-ss", str(start),
+            "-t", str(segment_duration),
+            "-i", audio_path,
+            "-c", "copy",
+            seg_path,
+        ]
+        subprocess.run(cmd, check=True)
+        segments.append(seg_path)
+
+    return segments
+
+
 def get_audio_duration_seconds(audio_path: str) -> float:
     """Get the duration of an audio file in seconds using ffprobe."""
     import subprocess

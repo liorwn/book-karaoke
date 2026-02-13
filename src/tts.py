@@ -77,15 +77,110 @@ def _split_text(text: str, max_chars: int = CHUNK_SIZE) -> list[str]:
     return chunks
 
 
+MAX_RETRIES = 3
+
+
 async def _generate_one(text: str, voice_id: str, output_path: str) -> None:
-    """Generate a single TTS segment."""
-    communicate = edge_tts.Communicate(text, voice_id)
-    await communicate.save(output_path)
+    """Generate a single TTS segment with retry on transient errors."""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            communicate = edge_tts.Communicate(text, voice_id)
+            await communicate.save(output_path)
+            return
+        except Exception as exc:
+            if attempt < MAX_RETRIES:
+                wait = attempt * 2
+                _log(f"[tts] Attempt {attempt} failed ({exc}), retrying in {wait}s...")
+                await asyncio.sleep(wait)
+            else:
+                raise
+
+
+async def _generate_all(
+    chunks: list[str],
+    voice_id: str,
+    output_path: str,
+    progress_callback=None,
+) -> str:
+    """Generate TTS for all chunks in a single event loop."""
+    total = len(chunks)
+
+    if total == 1:
+        await _generate_one(chunks[0], voice_id, output_path)
+    else:
+        tmp_dir = tempfile.mkdtemp(prefix="tts_segments_")
+        segment_paths = []
+
+        for i, chunk in enumerate(chunks):
+            pct = i / total
+            _log(f"[tts] Chunk {i + 1}/{total} ({len(chunk)} chars)...")
+
+            if progress_callback:
+                progress_callback("tts", pct, f"Generating speech ({i + 1}/{total})...")
+
+            seg_path = os.path.join(tmp_dir, f"seg_{i:03d}.mp3")
+            await _generate_one(chunk, voice_id, seg_path)
+            segment_paths.append(seg_path)
+
+        # Concatenate MP3 segments
+        with open(output_path, "wb") as out:
+            for p in segment_paths:
+                out.write(Path(p).read_bytes())
+
+        # Cleanup
+        for p in segment_paths:
+            os.unlink(p)
+        os.rmdir(tmp_dir)
+
+    return output_path
 
 
 def _log(msg: str) -> None:
     """Print and flush immediately."""
     print(msg, flush=True)
+
+
+def _run_async(coro):
+    """Run an async coroutine, creating a new event loop if needed."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        # We're inside an existing event loop (e.g. FastAPI thread) —
+        # create a fresh loop in this thread.
+        new_loop = asyncio.new_event_loop()
+        try:
+            return new_loop.run_until_complete(coro)
+        finally:
+            new_loop.close()
+    else:
+        return asyncio.run(coro)
+
+
+def generate_tts_segment(
+    text: str,
+    output_path: str,
+    voice: str = DEFAULT_VOICE,
+) -> str:
+    """Generate TTS for a single chapter/segment. No progress callback."""
+    voice_id = _resolve_voice(voice)
+    chunks = _split_text(text)
+    _log(f"[tts] Segment: {len(text)} chars, {len(chunks)} chunk(s)")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    _run_async(_generate_all(chunks, voice_id, output_path))
+    return output_path
+
+
+def concatenate_mp3_files(segment_paths: list[str], output_path: str) -> str:
+    """Binary-append MP3 files into one. MP3 is frame-based so this is valid."""
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "wb") as out:
+        for p in segment_paths:
+            out.write(Path(p).read_bytes())
+    _log(f"[tts] Concatenated {len(segment_paths)} segments -> {output_path}")
+    return output_path
 
 
 def generate_tts(
@@ -113,34 +208,7 @@ def generate_tts(
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-    if total == 1:
-        # Single chunk
-        asyncio.run(_generate_one(text, voice_id, output_path))
-    else:
-        # Multiple chunks — generate each, concatenate, report progress
-        tmp_dir = tempfile.mkdtemp(prefix="tts_segments_")
-        segment_paths = []
-
-        for i, chunk in enumerate(chunks):
-            pct = i / total
-            _log(f"[tts] Chunk {i + 1}/{total} ({len(chunk)} chars)...")
-
-            if progress_callback:
-                progress_callback("tts", pct, f"Generating speech ({i + 1}/{total})...")
-
-            seg_path = os.path.join(tmp_dir, f"seg_{i:03d}.mp3")
-            asyncio.run(_generate_one(chunk, voice_id, seg_path))
-            segment_paths.append(seg_path)
-
-        # Concatenate MP3 segments
-        with open(output_path, "wb") as out:
-            for p in segment_paths:
-                out.write(Path(p).read_bytes())
-
-        # Cleanup
-        for p in segment_paths:
-            os.unlink(p)
-        os.rmdir(tmp_dir)
+    _run_async(_generate_all(chunks, voice_id, output_path, progress_callback))
 
     file_size = os.path.getsize(output_path)
     _log(f"[tts] Audio saved to {output_path} ({file_size / 1024:.1f} KB)")
